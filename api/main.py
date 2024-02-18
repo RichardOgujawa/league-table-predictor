@@ -55,8 +55,6 @@ HEADERS = {
 # Brighton's team_id is 30, Sheffield United's team_id is 15
 TEAM_NAMES_AND_IDS = (('Brighton And Hove Albion', 30), ('Sheffield United', 15))
 
-engine = create_engine('sqlite:///fall_from_grace.db')
-
 """### **1.3 Utility Functions**"""
 
 """# UTILITY FUNCTIONS"""
@@ -323,10 +321,10 @@ def home():
       })
 
 
-#--- Code should be above this line---
-# # Run server
-# if __name__ == "__main__": 
-#    app.run(debug=True)
+# --- Code should be above this line---
+# Run server
+if __name__ == "__main__": 
+   app.run(debug=True)
 
 # Production server
 # More on it here: 
