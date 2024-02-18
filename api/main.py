@@ -5,22 +5,20 @@
 """### **1.1 Imports**"""
 
 import requests
-# from bs4 import BeautifulSoup
-# import json
-# import pandas as pd
-# import re
-# from time import sleep
-# from datetime import datetime
-# from tqdm import tqdm_notebook
-# from datetime import datetime
-# import math
-# import random
-# import matplotlib.pyplot as plt
-# import numpy as np
-# import matplotlib.cm as cm
-# from matplotlib.colors import Normalize
+from bs4 import BeautifulSoup
+import json
+import pandas as pd
+import re
+from time import sleep
+from datetime import datetime, date
+from tqdm import tqdm_notebook
+import math
+import random
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
 # from sqlalchemy import create_engine
-# from datetime import date
 # from sqlalchemy import text
 # import sqlite3
 from flask import Flask, request, jsonify

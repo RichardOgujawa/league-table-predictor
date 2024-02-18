@@ -1,2 +1,9 @@
 Flask==3.0.2
 requests==2.31.0
+bs4==0.0.2
+pandas==2.2.0
+tqdm==4.66.2
+matplotlib==3.8.3
+numpy==1.26.3
+# The following are part of pythons standard library and doesn't need to be installed
+# json, re, time, datetime, math
