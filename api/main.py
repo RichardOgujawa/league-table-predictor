@@ -53,8 +53,8 @@ def home():
 
 # --- Code should be above this line---
 # Run server
-if __name__ == "__main__": 
-   app.run(debug=True)
+# if __name__ == "__main__": 
+#    app.run(debug=True)
 
 # Production server
 # More on it here: 
