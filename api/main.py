@@ -40,9 +40,9 @@ def home():
     <ul>
       <li>Bundesliga => <a href="https://{domain_name}/league/bundesliga">https://{domain_name}/league/bundesliga</a></li>
       <li>English Premier League => <a href="https://{domain_name}/league/epl">https://{domain_name}/league/epl</a></li>
-      <li>LaLiga => <a href="https://{domain_name}/league/laliga">https://{domain_name}/league/la_liga</a></li>
+      <li>LaLiga => <a href="https://{domain_name}/league/laliga">https://{domain_name}/league/laliga</a></li>
       <li>Ligue 1 => <a href="https://{domain_name}/league/ligue_1">https://{domain_name}/league/ligue_1</a></li>
-      <li>Serie A=> <a href="https://{domain_name}/league/serie-a">https://{domain_name}/league/serie-a</a></li>
+      <li>Serie A=> <a href="https://{domain_name}/league/serie-a">https://{domain_name}/league/serie_a</a></li>
     </ul>
   """
 
