@@ -6,27 +6,162 @@ import pandas as pd
 import re
 from time import sleep
 from datetime import datetime, date
-from tqdm import tqdm_notebook
-import math
-import random
 import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib.cm as cm
-from matplotlib.colors import Normalize
 from flask import Flask, request, jsonify
 import json
-import functions as f
-
+import datetime
+import re
 
 """### Create Flask Application"""
 app = Flask(__name__)
 
+"""### **1.3 Utility Functions**"""
 
-from constants import HEADERS, TEAM_NAMES_MAP
-import utilities as u
+"""### **1.2 Constants**"""
+USER_AGENT = {
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+}
+
+HEADERS = {
+    'authority': 'api.sofascore.com',
+    'accept': '*/*',
+    'accept-language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'cache-control': 'max-age=0',
+    'if-none-match': 'W/"0839132050"',
+    'origin': 'https://www.sofascore.com',
+    'referer': 'https://www.sofascore.com/',
+    'sec-ch-ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'If-Modified-Since' : 'Tue, 13 Feb 2024 00:00:00 GMT'
+}
+
+TEAM_NAMES_MAP = {
+      # This list is not exhaustive and may need to be updated
+        'epl' : {
+            'Brighton & Hove Albion' : 'Brighton',
+            'Luton Town' : 'Luton',
+            'Tottenham Hotspur' : 'Tottenham',
+            'West Ham United' : 'West Ham',
+            'Wolverhampton' : 'Wolverhampton Wanderers',
+            'Leeds United' : 'Leeds',
+            'Leicester City': 'Leicester',
+            'Norwich City'  : 'Norwich',
+            'Cardiff City'  : 'Cardiff',
+            'Huddersfield Town'  : 'Huddersfield',
+            'Swansea City'  : 'Swansea',
+            'Stoke City'  : 'Stoke',
+            'Hull City' : 'Hull',
+            "Parma" : "Parma Calcio 1913"
+        },
+        'bundesliga': {
+            "Bayer 04 Leverkusen" : "Bayer Leverkusen",
+            "RB Leipzig" : "RasenBallsport Leipzig",
+            "SV Werder Bremen" : "Werder Bremen",
+            "SC Freiburg" : "Freiburg",
+            "TSG Hoffenheim" : "Hoffenheim",
+            "VfL Wolfsburg" : "Wolfsburg",
+            "VfL Bochum 1848" : "Bochum",
+            "1. FC Heidenheim" : "FC Heidenheim",
+            "1. FSV Mainz 05" : "Mainz 05",
+            "1. FC Köln": "FC Cologne",
+            "1. FC Union Berlin": "Union Berlin",
+            "FC Augsburg": "Augsburg",
+            "FC Bayern München": "Bayern Munich",
+            "FC Ingolstadt 04": "Ingolstadt",
+            "Borussia M'gladbach": "Borussia M.Gladbach",
+            "Hertha BSC": "Hertha Berlin",
+            "FC Schalke 04" : "Schalke 04",
+            "SpVgg Greuther Fürth": "Greuther Fuerth",
+            "SC Paderborn 07": "Paderborn",
+            "Fortuna Düsseldorf" : "Fortuna Duesseldorf",
+            "1. FC Nürnberg": "Nuernberg",
+            "Darmstadt 98": "Darmstadt",
+        },
+        'serie_a': {
+            "Milan" : 'AC Milan',
+            "Hellas Verona" : "Verona",
+            "SPAL" : "SPAL 2013",
+            "ChievoVerona": "Chievo"
+        },
+        'laliga': {
+            'Girona FC' : 'Girona', 
+            'Atlético Madrid' : 'Atletico Madrid', 
+            'Deportivo Alavés' : 'Alaves',
+            'Cádiz' : 'Cadiz', 
+            'Almería' : 'Almeria'
+        },
+        'ligue_1': {
+            'Paris Saint-Germain' : 'Paris Saint Germain',
+            'Stade Brestois' : 'Brest',
+            'Stade Rennais': 'Rennes',
+            'AS Monaco': 'Monaco',
+            'Olympique de Marseille': 'Marseille',
+            'Saint-Étienne' : 'Saint-Etienne',
+            'RC Strasbourg' : 'Strasbourg',
+            'Stade de Reims' : 'Reims',
+            'Olympique Lyonnais': 'Lyon',
+        },
+      }
+
+"""# UTILITY FUNCTIONS"""
+# Convert to lowercase
+def string_to_slug(text):
+    slug = text.lower()
+    # Replace spaces with hyphens
+    slug = slug.replace(' ', '-')
+    # Remove non-alphanumeric characters except hyphens
+    slug = re.sub(r'[^a-z0-9-]', '', slug)
+    return slug
+
+# Convert slug into title case
+def slug_to_string(slug_text):
+    # Split the slug text by '-'
+    words = slug_text.split('-')
+
+    # Capitalize each word and join them with a space
+    title_case_text = ' '.join(word.capitalize() for word in words)
+
+    return title_case_text
+
+# Unix timestamp conversion
+def unix_time_to_date(timestamp):
+  # Convert Unix timestamp to datetime object
+  dt_object = datetime.fromtimestamp(timestamp)
+
+  # Format the datetime object as a string
+  formatted_date = dt_object.strftime("%d-%b-%Y")
+
+  return formatted_date
+
+# Using poisson distribution to calculate probability fo home team and away team scoring x number of goals
+def factorial(x):
+  # When we get to x = 1 or 0, just return one as the thing to be multiplied by the other numbers
+  if x == 0 or x == 1:
+        return 1
+  # Else return the multiplication of x and x-1
+  return x * factorial(x - 1)
+
+# Poisson Distribution Formula for likelihood of a team scoring x number of goals
+def poisson_distribution(rate, x):
+  E = 2.718
+  return (rate ** x) * (E ** -rate)/ factorial(x)
+
+# Convert strings into param strings, i.e. instead of 'Moises Caicedo', you'd have 'moises+caicedo'
+def str_param(str):
+  return '+'.join(str.split(' ')).lower()
+
+# function to split the team_name in half because team_name concatenates onto itself when the dfs are added
+def split_name_in_half(name):
+  size = int(len(name)/2)
+  return name[:size]
+
 """## **1. IMPORTS, CONSTANTS AND FUNCTIONS**"""
 # This is where all the imports, constants and functions will be stored for the project.
-
 
 """## **2. Data Extraction**
 
@@ -409,7 +544,7 @@ def monte_carlo(home_team, away_team, avg_gpg, home_df, away_df, print_options=F
       rate = projected_goals['projected_home_goals']
     else: rate = projected_goals['projected_away_goals']
     # Get the probability for each number of goals
-    data = [u.poisson_distribution(rate, x) for x in range(0, 9)]
+    data = [poisson_distribution(rate, x) for x in range(0, 9)]
     # Create a list with the team 'home' or 'away' and the probability
     data = [team] + data
     if print_options:
@@ -559,6 +694,7 @@ def get_expected_df(home_df, away_df, avg_gpg):
       'PTS': end_of_season_xp(row['team_id'], home_df, away_df, avg_gpg)
     })
 
+
   # Create the expected premier league df, sort by points and reset the index and drop the old one
   expected_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_data).sort_values(by='PTS', ascending=False).reset_index(drop=True)
   # Add one to all the values so that the index goes from 1 to 20, instead of 0 to 19
@@ -572,7 +708,7 @@ def get_expected_df(home_df, away_df, avg_gpg):
 
 def merge_home_n_away_df(expected_df, home_df, away_df): 
   df = home_df + away_df
-  df['team_name'] = df['team_name'].apply(u.split_name_in_half)
+  df['team_name'] = df['team_name'].apply(split_name_in_half)
   df.drop(columns=['team_id', 'xG', 'xGA', 'xPTS', 'sofascore_team_id', 'gpg scored', 'gpg conceded'], inplace=True)
 
   # Merge dfs to get predicted points and sort by current points
@@ -595,24 +731,24 @@ def merge_home_n_away_df(expected_df, home_df, away_df):
   return merged_df
 
 
-# # Main function to run everything sequentially
-# def predict_main(league_name, print_options=False):
-#   # Get current league table with sofascore team id and understat stats 
-#   home_df, away_df = f.get_current_league_table_df_data(league_name)
-#   # Get the average goals scored and conceded per game
-#   avg_gpg_dict = f.get_avg_gpg_dict(home_df, away_df)
-#   # Get the predicted points
-#   expected_df = f.get_expected_df(home_df, away_df, avg_gpg_dict)
-#   # Merge the predicted points with the current table
-#   merged_df = f.merge_home_n_away_df(expected_df, home_df, away_df)
+# Main function to run everything sequentially
+def predict_main(league_name, print_options=False):
+  # Get current league table with sofascore team id and understat stats 
+  home_df, away_df = get_current_league_table_df_data(league_name)
+  # Get the average goals scored and conceded per game
+  avg_gpg_dict = get_avg_gpg_dict(home_df, away_df)
+  # Get the predicted points
+  expected_df = get_expected_df(home_df, away_df, avg_gpg_dict)
+  # Merge the predicted points with the current table
+  merged_df = merge_home_n_away_df(expected_df, home_df, away_df)
 
-#   returned_json = {
-#     'league': league_name, 
-#     'number_of_teams': len(merged_df),
-#     'predicted_table': merged_df.to_dict('records')
-#   }
+  returned_json = {
+    'league': league_name, 
+    'number_of_teams': len(merged_df),
+    'predicted_table': merged_df.to_dict('records')
+  }
 
-#   return returned_json
+  return returned_json
 
 
 # App routes
@@ -632,16 +768,16 @@ def home():
     </ul>
   """
 
-# @app.route("/league/<league_name>")
-# def predict(league_name):
-#   predicted_table_as_str = predict_main(league_name, True)
-#   return json.dumps(predicted_table_as_str)
+@app.route("/league/<league_name>")
+def predict(league_name):
+  predicted_table_as_str = predict_main(league_name, True)
+  return json.dumps(predicted_table_as_str)
 
 
 # --- Code should be above this line---
 # Run server
-# if __name__ == "__main__": 
-#    app.run(debug=True)
+if __name__ == "__main__": 
+   app.run(debug=True)
 
 # Production server
 # More on it here: 
