@@ -297,8 +297,8 @@ def get_sofascore_df_data(league_name, print_options=False):
 """### **3.1 Home vs. Away Stats**"""
 # Teams perform differently at home vs playing at other stadiums, so the stats for home and away games will be divided into two dataframes to ensure that we capture this nuance.
 
-def create_initial_table(league_name):
-  # Get underst
+def get_current_league_table_df_data(league_name):
+  # Get understat and sofascore data with stats and ids
   understat_json = get_understat_league_json_data(league_name)
   sofascore_df = get_sofascore_df_data(league_name )
   
@@ -371,21 +371,360 @@ def create_initial_table(league_name):
     away_league_table_data.append(away_team_data)
 
 
-  columns = ['team_id', 'team_name','M', 'W','D','L', 'G', 'GA', 'PTS', 'xG', 'xGA', 'xPTS']
-  home_df = pd.DataFrame(columns=columns, data=home_league_table_data).sort_values(by='team_name')
-  away_df = pd.DataFrame(columns=columns, data=away_league_table_data).sort_values(by='team_name')
+    columns = ['team_id', 'team_name','M', 'W','D','L', 'G', 'GA', 'PTS', 'xG', 'xGA', 'xPTS']
+    home_df = pd.DataFrame(columns=columns, data=home_league_table_data).sort_values(by='team_name')
+    away_df = pd.DataFrame(columns=columns, data=away_league_table_data).sort_values(by='team_name')
 
-  # Add sofascore ids from previous table
-  home_df = pd.merge(home_df, sofascore_df, on='team_name')
-  away_df = pd.merge(away_df, sofascore_df, on='team_name')
+    # Add sofascore ids from previous table
+    home_df = pd.merge(home_df, sofascore_df, on='team_name')
+    away_df = pd.merge(away_df, sofascore_df, on='team_name')
 
-  print("First 5 rows of home dataframe")
-  print(home_df.head())
+    """### **3.2 Goals Per Game (GPG) Scored & Conceded**"""
+    """This Monte Carlo simulation relies on heavily on the idea of how many goals a team is projected to score and condede. The first step towards those values is getting the average goals scored and conceded - **gpg (goals per game) scored and the gpg conceded.**"""
 
-domain_name = "https://league-table-predictor-git-main-richardogujawa.vercel.app"
+    # Add two columns to the df 'goals scored per game' and 'goals conceded per game'
+    home_df['gpg scored'] = home_df['G']/home_df['M']
+    home_df['gpg conceded'] = home_df['GA']/home_df['M']
+
+    away_df['gpg scored'] = away_df['G']/away_df['M']
+    away_df['gpg conceded'] = away_df['GA']/away_df['M']
+
+    print("First 5 rows of home dataframe")
+    return home_df, away_df
+
+def get_avg_gpg_dict(home_df, away_df):
+  """### **3.3 League average GPG scored and conceded.**"""
+  # Home teams
+  # Add average goals per home team and goals per away team in the dfs and
+  # then divide it by the number of teams in the league
+  num_of_teams = len(home_df)
+  home_avg_goals_per_game_scored = sum(home_df['gpg scored'])/num_of_teams
+  home_avg_goals_per_game_scored
+
+  # Away teams
+  home_avg_goals_per_game_conceded = sum(home_df['gpg conceded'])/num_of_teams
+  home_avg_goals_per_game_conceded
+
+  away_avg_goals_per_game_scored = sum(away_df['gpg scored'])/num_of_teams
+  away_avg_goals_per_game_scored
+
+  # Add average goals per game conceded for
+  away_avg_goals_per_game_conceded = sum(away_df['gpg conceded'])/num_of_teams
+  away_avg_goals_per_game_conceded
+
+  avg_gpg = {
+      'total avg home gpg scored': home_avg_goals_per_game_scored,
+      'total avg home gpg conceded': home_avg_goals_per_game_conceded,
+      'total avg away gpg scored': away_avg_goals_per_game_scored,
+      'total avg away gpg conceded': away_avg_goals_per_game_conceded
+  }
+
+  avg_gpg
+
+"""### **3.4 Functions for Monte Carlo Simulation**"""
+# Along with the overall averages we also want to get the gpgs for each team
+# This function allows us to get metrics for any given team from either the home_df or away_df
+"""Some Utility functions"""
+def find_team_metric(ha, team_name, metric, home_df, away_df):
+  # NOTE: ha = home_or_away
+  # If home pull the data from the home df
+  if ha == 'home': return home_df[home_df['team_name'] == team_name][metric].iloc[0]
+  # Otherwise pull the data from the away df
+  else: return away_df[away_df['team_name'] == team_name][metric].iloc[0]
+
+# Get all the remaining matchups for a given team
+def get_fixtures(sofascore_id, print_options=False):
+  fixtures_res = requests.get(f'https://api.sofascore.com/api/v1/team/{sofascore_id}/events/next/0', headers=HEADERS)
+  fixtures_data = fixtures_res.json()['events']
+  # Only return dictionaries pertaining to Premier League games
+  games_left = []
+  for fixture in fixtures_data:
+    if fixture['tournament']['name'] == 'Premier League':
+      home_team = fixture['homeTeam']['name']
+      away_team = fixture['awayTeam']['name']
+      # Update the name of the teams to match the ones from understat
+      # Change 'Brighton & Hove Albion' to 'Brighton'
+      if home_team == 'Brighton & Hove Albion':
+        home_team = 'Brighton'
+      if away_team =='Brighton & Hove Albion':
+        away_team = 'Brighton'
+      # Change 'Luton Town' to 'Luton'
+      if home_team == 'Luton Town':
+        home_team = 'Luton'
+      if away_team =='Luton Town':
+        away_team = 'Luton'
+      # Change 'Tottenham Spurs' to 'Tottenham'
+      if home_team == 'Tottenham Hotspur':
+        home_team = 'Tottenham'
+      if away_team =='Tottenham Hotspur':
+        away_team = 'Tottenham'
+      # Change 'Wolverhampton' to 'Wolverhampton Wanderers'
+      if home_team == 'Wolverhampton':
+        home_team = 'Wolverhampton Wanderers'
+      if away_team =='Wolverhampton':
+        away_team = 'Wolverhampton Wanderers'
+      # Change 'West Ham United' to 'West Ham'
+      if home_team == 'West Ham United':
+        home_team = 'West Ham'
+      if away_team =='West Ham United':
+        away_team = 'West Ham'
+
+      # Store in data dict
+      data = {
+          'home_team': home_team,
+          'away_team': away_team,
+      }
+
+      # Append to pl_games_list
+      games_left.append(data)
+
+  # Return the list of the remaining games
+  return games_left
+
+def who_wins(home_win, away_win, draw, HOME_TEAM, AWAY_TEAM):
+  if home_win > away_win :
+    if home_win > draw: return HOME_TEAM
+    else: return 'DRAW'
+  elif away_win > home_win:
+    if away_win > draw: return AWAY_TEAM
+    else: return 'DRAW'
+
+def points_from_game(team_name, result):
+  # result = the team who won, or if it's a draw then just 'DRAW'
+  # If they won give them 3 points
+  if result == team_name:
+    return 3
+  # If they drew give them 1 point
+  elif result == 'DRAW':
+    return 1
+  # If they lost give them 0 points
+  else:
+    return 0
+  
+"""### **3.5 Monte Carlo Algorithm**"""
+# MONTE CARLO SIMULATION FUNCTION
+
+## STEP 1 | CHOOSE TEAMS & GET HOME AND AWAY PROJECTED GOALS
+# You can put it in any two teams and see whose likely to win
+def monte_carlo(home_team, away_team, avg_gpg, home_df, away_df, print_options=False):
+  HOME_TEAM = home_team
+  AWAY_TEAM = away_team
+
+  attack_def_n_proj = {
+      'projected_home_goals': find_team_metric('home', HOME_TEAM, 'gpg scored', home_df, away_df),
+      'projected_away_goals': find_team_metric('away', AWAY_TEAM, 'gpg scored', home_df, away_df),
+
+      'home_attack': find_team_metric('home', HOME_TEAM, 'gpg scored', home_df, away_df)/avg_gpg['total avg home gpg scored'],
+      'away_defence': find_team_metric('away', AWAY_TEAM, 'gpg conceded', home_df, away_df)/avg_gpg['total avg home gpg scored'],
+
+      'away_attack': find_team_metric('away', AWAY_TEAM, 'gpg scored', home_df, away_df)/avg_gpg['total avg away gpg scored'],
+      'home_defence': find_team_metric('home', HOME_TEAM, 'gpg conceded', home_df, away_df)/avg_gpg['total avg away gpg scored'],
+  }
+
+  projected_goals = {
+      'projected_home_goals': attack_def_n_proj['home_attack'] * attack_def_n_proj['away_defence'] * avg_gpg['total avg home gpg scored'],
+      'projected_away_goals': attack_def_n_proj['away_attack'] * attack_def_n_proj['home_defence'] * avg_gpg['total avg away gpg scored'],
+  }
+
+  projected_goals['projected_total_goals'] = projected_goals['projected_home_goals'] + projected_goals['projected_away_goals']
+
+  if print_options:
+    print("Projected Goals: ", projected_goals, end='\n\n')
+
+  ## STEP 2 | PROBABILITY OF EACH TEAM SCORING X NUM OF GOALS
+  columns= ['teams'] + list(range(0, 9))  # home_team or away_team and the number of goals they might score
+  prob_df_data=[]
+
+  # For each team, get the probabiltiy of them scoring each number of goals using the poisson distribution
+  for team in ['home_team', 'away_team']:
+    # The rate (average) will change depending on the team in question
+    if team == 'home_team':
+      rate = projected_goals['projected_home_goals']
+    else: rate = projected_goals['projected_away_goals']
+    # Get the probability for each number of goals
+    data = [poisson_distribution(rate, x) for x in range(0, 9)]
+    # Create a list with the team 'home' or 'away' and the probability
+    data = [team] + data
+    if print_options:
+      print(data)
+
+    prob_df_data.append(data)
+
+  # Print a new line to space out print statements
+  if print_options:
+    print()
+
+  # Probability df
+  prob_df = pd.DataFrame(columns=columns, data=prob_df_data)
+  # Set the teams column as the index
+  prob_df.set_index('teams', inplace=True, drop=True)
+
+  if print_options:
+    print("Probability home team scoring 0 goals, rounded to 2 d.p.: ", round(prob_df.iloc[0:1, 0].values[0], 2))
+
+  ## STEP 3 | CONTINGENCY TABLE TO SHOW THE PROBABILITY OF EACH SCORELINE
+  # Create DataFrames representing the range of values for each factor
+  away_goals = pd.DataFrame({'Away Goals': range(9)})
+  home_goals = pd.DataFrame({'Home Goals': range(9)})
+
+  # Construct a DataFrame with all possible combinations of away and home goals
+  # where each row represents a different combination of away and home goals
+  df = pd.DataFrame([(away, home) for away in range(9) for home in range(9)],
+                    columns=['Away Goals', 'Home Goals'])
+
+  # Compute the cross-tabulation
+  two_way_table = pd.crosstab(df['Away Goals'], df['Home Goals'])
+
+  # Fill in the values for each cell in the cross-tabulated df
+  row_index=0 # away team score
+  for row in two_way_table.values:
+    col_index=0 # home team score
+    for col in row:
+      home_team_prob = float(prob_df.iloc[0:1, col_index].values)
+      away_team_prob = float(prob_df.iloc[1:2, row_index].values)
+      two_way_table.iloc[row_index, col_index] =  '{:.2f}%'.format(home_team_prob * away_team_prob * 100)
+      col_index+=1
+    row_index+=1
+
+  if print_options:
+    print("Odds of home team vs away team goals: \n")
+
+  # Find the sum of percentage chance that the team wil win, i.e. sum of probabilities
+  home_win = 0
+  away_win = 0
+  draw = 0
+
+  row_index=0 # away team score
+  for row in two_way_table.values:
+      col_index=0 # home team score
+      for col in row:
+        # If the home_team scores more
+        if(col_index > row_index):
+          home_win += float(two_way_table.iloc[row_index, col_index][:-1])
+        # Else if the away team score more
+        elif(row_index > col_index):
+          away_win += float(two_way_table.iloc[row_index, col_index][:-1])
+        # Else it's a draw
+        else:
+          draw += float(two_way_table.iloc[row_index, col_index][:-1])
+        col_index+=1
+      row_index+=1
+
+  result = who_wins(home_win, away_win, draw, HOME_TEAM, AWAY_TEAM)
+
+  # Create an list of objects that will check store the number of expected points per game.
+  expected_points_for_this_game = {
+      HOME_TEAM : points_from_game(HOME_TEAM, result),
+      AWAY_TEAM : points_from_game(AWAY_TEAM, result)
+  }
+
+  # Return a dict with the expected number of points that will achieved by each team.
+  return expected_points_for_this_game
+
+# Pass in a team and get how many point we expect them to get by the end of the season
+def end_of_season_xp(id, home_df, away_df, avg_gpg, print_options=False):
+
+  # Get the sofascore id from the df to get the fixtures from sofascore
+  sofascore_id = home_df[home_df['team_id'] == id]['sofascore_team_id'].iloc[0]
+
+  if print_options:
+    print("understat team_id:", id, " sofascore team_id: ", sofascore_id)
+
+  pl_games = get_fixtures(sofascore_id)
+
+  # Get the team name from the df
+  team = home_df[home_df['team_id'] == id]['team_name'].iloc[0]
+  print(f"Getting the expected points for {team}")
+
+  # Get their current number of points
+  base = home_df[home_df['team_name'] == team]['PTS'].iloc[0] + away_df[away_df['team_name'] == team]['PTS'].iloc[0]
+  if print_options:
+    print("base pts: ", base)
+  x_pts = 0
+  for game in pl_games:
+    # Get the home and away team names from the game data
+    home_team = game['home_team']
+    away_team = game['away_team']
+    if print_options:
+      print(home_team, ", " ,away_team)
+
+    # Get the expected results
+    results = monte_carlo(home_team, away_team, avg_gpg, home_df, away_df)
+    if print_options:
+      print(results)
+
+    # Get the expected number of points from the results
+    pts_from_game = results[team]
+    x_pts += pts_from_game
+
+  results = base + x_pts
+  # return the total num of expected points
+  return results
+
+"""### **3.6 End of League Table Prediction**"""
+# Simulate the remaining fixtures and print the resulting Premiere League Table.
+
+def get_expected_pl_df(home_df, away_df, avg_gpg):
+  # Simulate the expected end of season PL table
+  expected_pl_data = []
+
+  for index, row in home_df.iterrows():
+    expected_pl_data.append({
+      'team_name' : row['team_name'],
+      'PTS': end_of_season_xp(row['team_id'], home_df, away_df, avg_gpg)
+    })
+
+  # Create the expected premier league df, sort by points and reset the index and drop the old one
+  expected_pl_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_pl_data).sort_values(by='PTS', ascending=False).reset_index(drop=True)
+  # Add one to all the values so that the index goes from 1 to 20, instead of 0 to 19
+  expected_pl_df.index +=1
+  # Rename index to position
+  expected_pl_df.rename_axis('position', axis='index', inplace=True)
+
+  return expected_pl_df
+
+# Current PL Table
+
+# function to split the team_name in half because team_name concatenates onto itself when the dfs are added
+def split_name_in_half(name):
+  size = int(len(name)/2)
+  return name[:size]
+
+def merge_home_n_away_df(expected_pl_df, home_df, away_df): 
+  pl_df = home_df + away_df
+  pl_df['team_name'] = pl_df['team_name'].apply(split_name_in_half)
+  pl_df.drop(columns=['team_id', 'xG', 'xGA', 'xPTS', 'sofascore_team_id', 'gpg scored', 'gpg conceded'], inplace=True)
+
+  # Merge dfs to get predicted points and sort by current points
+  # Merge the DataFrames
+  merged_pl_df = pl_df.merge(expected_pl_df, on='team_name', suffixes=('_current', '_prediction'))
+
+  # Sort the merged DataFrame
+  merged_pl_df = merged_pl_df.sort_values(by='PTS_current', ascending=False)
+
+  # Reset the index
+  merged_pl_df.reset_index(drop=True, inplace=True)
+
+  # Calculate Goal Difference
+  merged_pl_df['GD'] = merged_pl_df['G'] - merged_pl_df['GA']
+  # Reorder columns
+  merged_pl_df = merged_pl_df[['team_name', 'M', 'D', 'L', 'G', 'GA', 'GD', 'PTS_current', 'PTS_prediction']]
+  # Print df
+  return merged_pl_df
+
+# Main function to run everything sequentially
+def predict_main(league_name):
+  # Get understat data 
+  home_df, away_df = get_current_league_table_df_data(league_name)
+  avg_gpg_dict = get_avg_gpg_dict(home_df, away_df)
+  return get_expected_pl_df(home_df, away_df, avg_gpg_dict).to_dict('records')
+
+
+
 # App routes
 @app.route("/")
 def home():
+  domain_name = "https://league-table-predictor-git-main-richardogujawa.vercel.app"
   return f"""
     <h1>Welcome to League Table Predictor API</h1>
     <p>The predictor predicts the outcome of the league based on the current form of the teams in each league.</p>
@@ -401,8 +740,7 @@ def home():
 
 @app.route("/league/<league_name>")
 def predict(league_name):
-  
-  return get_understat_league_json_data(league_name)
+  predict_main(league_name)
 
 
 # --- Code should be above this line---
