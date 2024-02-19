@@ -112,17 +112,9 @@ The data is extracted from the [Understat.com](https://understat.com/) website, 
 """
 
 # Get the understat league data
-def get_understat_league_data(league_name, print_options=False):
-  leagues = {
-      'EPL' : 'EPL',
-      'La Liga' : 'La_liga',
-      'Bundesliga' : 'Bundesliga',
-      'Serie A' : 'Serie_A',
-      'Ligue 1' : 'Ligue_1'
-  }
-
+def get_understat_league_json_data(league_name, print_options=False):
   # Make fetch request to website
-  understat_res = requests.get(f"https://understat.com/league/{leagues[league_name]}/2023")
+  understat_res = requests.get(f"https://understat.com/league/{league_name}/2023")
 
   # Check status code
   status_code = understat_res.status_code
@@ -132,15 +124,18 @@ def get_understat_league_data(league_name, print_options=False):
 
     # Get data from the script it's stored in
     scripts = soup.find_all('script')
-    print(f"There are {len(scripts)} scripts. \n" if understat_res.status_code == 200 else f'Wasn\'t able to scrape data, status code returned was {understat_res.status_code} \n')
+    if print_options:
+      print(f"There are {len(scripts)} scripts. \n" if understat_res.status_code == 200 else f'Wasn\'t able to scrape data, status code returned was {understat_res.status_code} \n')
 
     # The data is in the third script tag
-    print("The data is in the third script tag:")
-    print(scripts[2], end='\n\n')
+    if print_options:
+      print("The data is in the third script tag:")
+      print(scripts[2], end='\n\n')
 
     # Convert the script into a string, and then convert that string into a json object
     strings = scripts[2].string
-    print("Data as a string: \n" + strings.strip(), end='\n\n')
+    if print_options:
+      print("Data as a string: \n" + strings.strip(), end='\n\n')
 
     # Remove unneccessary symbols so we only have JSON data
     #ind_start is the index to start the slice from, ind_end is the index we want to end the slice before
@@ -159,38 +154,36 @@ def get_understat_league_data(league_name, print_options=False):
   else:
     print('Error occured with status code:', status_code)
 
-# get_understat_league_data('EPL')
-
 """### **2.2 Convert Data from String to JSON Object**
 
 ### **2.3 Enrich data with SofaScore team ids**
 In order to make predictions about the resulting tables, we need access to the remaining fixtures. [Sofascore.com](https://www.sofascore.com/), a similar web service to to that of Understat, but offers a slightly easier format for collecting fixtures data.
 """
 
-def get_sofascore_data(league_name, print_options=False):
+def get_sofascore_df_data(league_name, print_options=False):
   # The ids for each league is required in the url for the league table
   leagues = {
-      'EPL' : {
+      'epl' : {
           'country' : 'england',
           'league' : 'premier-league',
           'id': 17
       },
-      'La Liga' : {
+      'la_liga' : {
           'country' : 'spain',
           'league': 'laliga',
           'id' : 8
       },
-      'Bundesliga' : {
+      'bundesliga' : {
           'country' : 'germany',
           'league' : 'bundesliga',
           'id' : 35
       },
-      'Serie A' : {
+      'serie_a' : {
           'country' : 'italy',
           'league': 'serie-a',
           'id': 23
       },
-      'Ligue 1' : {
+      'ligue_1' : {
           'country' : 'france',
           'league': 'ligue-1',
           'id' : 34
@@ -231,7 +224,7 @@ def get_sofascore_data(league_name, print_options=False):
   # This includes all the possible teams that could play in each league
   team_names_map = {
       # This list is not exhaustive and may need to be updated
-      'EPL' : {
+      'epl' : {
         'Brighton & Hove Albion' : 'Brighton',
         'Luton Town' : 'Luton',
         'Tottenham Hotspur' : 'Tottenham',
@@ -247,7 +240,7 @@ def get_sofascore_data(league_name, print_options=False):
         'Hull City' : 'Hull',
         "Parma" : "Parma Calcio 1913"
       },
-      'Bundesliga': {
+      'bundesliga': {
           "Bayer 04 Leverkusen" : "Bayern Leverkusen",
           "RB Leipzig" : "RasenBallsport Leipzig",
           "SV Werder Bremen" : "Werder Bremen",
@@ -271,13 +264,13 @@ def get_sofascore_data(league_name, print_options=False):
           "1. FC Nürnberg": "Nuernberg",
           "Darmstadt 98": "Darmstadt",
       },
-      'Serie A': {
+      'serie_a': {
         "Milan" : 'AC Milan',
         "Hellas Verona" : "Verona",
         "SPAL" : "SPAL 2013",
         "ChievoVerona": "Chievo"
       },
-      'La Liga': {
+      'la_liga': {
           '' : ''
       },
       'Ligue 1': {
@@ -298,27 +291,118 @@ def get_sofascore_data(league_name, print_options=False):
      print(sofascore_df)
   return sofascore_df
 
-get_sofascore_data('Bundesliga', True)
+"""## **3. Monte Carlo Simulation**"""
+# This section of the project looks at how the league table is likely to end up based on each team's current run of form. Of course, like most models, there are a number of unforseeable factors which limit the accuracy of the predictions, such as player availability, changes in coaching staff, and player/team morale. Nonetheless the simulation does provide a good basis for estimating (ceteris paribus) what the league table might end up looking like, and provide motive for the remainder of the project.
 
-# Test
+"""### **3.1 Home vs. Away Stats**"""
+# Teams perform differently at home vs playing at other stadiums, so the stats for home and away games will be divided into two dataframes to ensure that we capture this nuance.
+
+def create_initial_table(league_name):
+  # Get underst
+  understat_json = get_understat_league_json_data(league_name)
+  sofascore_df = get_sofascore_df_data(league_name )
+  
+  home_league_table_data = []
+  away_league_table_data =[]
+
+  # The team_ids are the keys for each team's dictionary, construct a list of these ids
+  TEAM_IDS = (team for team in understat_json)
+
+  # For each team do an accumulative value for matches, wins, draws, losses, etc.
+  for id in TEAM_IDS:
+    team_data = understat_json[id]
+
+    # print(team_data)
+    home_team_data = {
+        'team_id' : int(id),
+        'team_name' : team_data['title'],
+        'M': 0,
+        'W': 0,
+        'D' : 0,
+        'L': 0,
+        'G': 0,
+        'GA': 0,
+        'PTS': 0,
+        'xG': 0,
+        'xGA': 0,
+        'xPTS': 0,
+    }
+    away_team_data = {
+        'team_id' : int(id),
+        'team_name' : team_data['title'],
+        'M': 0,
+        'W': 0,
+        'D': 0,
+        'L': 0,
+        'G': 0,
+        'GA': 0,
+        'PTS': 0,
+        'xG': 0,
+        'xGA': 0,
+        'xPTS': 0,
+    }
+    # if it's a home game add to the rolling average / sum for the home object for the team
+    for game in team_data['history']:
+      # If home game update home_team_stats
+      if game['h_a'] == 'h':
+        home_team_data['M'] += 1
+        home_team_data['W'] += 1 if game['result'] == 'w' else 0
+        home_team_data['D'] += 1 if game['result'] == 'd' else 0
+        home_team_data['L'] += 1 if game['result'] == 'l' else 0
+        home_team_data['G'] += game['scored']
+        home_team_data['GA'] += game['missed']
+        home_team_data['PTS'] += game['pts']
+        home_team_data['xG'] += game['xG']
+        home_team_data['xGA'] += game['xGA']
+        home_team_data['xPTS'] += game['xpts']
+      else:
+        away_team_data['M'] += 1
+        away_team_data['W'] += 1 if game['result'] == 'w' else 0
+        away_team_data['D'] += 1 if game['result'] == 'd' else 0
+        away_team_data['L'] += 1 if game['result'] == 'l' else 0
+        away_team_data['G'] += game['scored']
+        away_team_data['GA'] += game['missed']
+        away_team_data['PTS'] += game['pts']
+        away_team_data['xG'] += game['xG']
+        away_team_data['xGA'] += game['xGA']
+        away_team_data['xPTS'] += game['xpts']
+
+    home_league_table_data.append(home_team_data)
+    away_league_table_data.append(away_team_data)
+
+
+  columns = ['team_id', 'team_name','M', 'W','D','L', 'G', 'GA', 'PTS', 'xG', 'xGA', 'xPTS']
+  home_df = pd.DataFrame(columns=columns, data=home_league_table_data).sort_values(by='team_name')
+  away_df = pd.DataFrame(columns=columns, data=away_league_table_data).sort_values(by='team_name')
+
+  # Add sofascore ids from previous table
+  home_df = pd.merge(home_df, sofascore_df, on='team_name')
+  away_df = pd.merge(away_df, sofascore_df, on='team_name')
+
+  print("First 5 rows of home dataframe")
+  print(home_df.head())
+
+domain_name = "https://league-table-predictor-git-main-richardogujawa.vercel.app"
+# App routes
 @app.route("/")
 def home():
-  return json.dumps({
-        'Brighton & Hove Albion' : 'Brighton',
-        'Luton Town' : 'Luton',
-        'Tottenham Hotspur' : 'Tottenham',
-        'West Ham United' : 'West Ham',
-        'Wolves' : 'Wolverhampton Wanderers',
-        'Leeds United' : 'Leeds',
-        'Leicester City': 'Leicester',
-        'Norwich City'  : 'Norwich',
-        'Cardiff City'  : 'Cardiff',
-        'Huddersfield Town'  : 'Huddersfield',
-        'Swansea City'  : 'Swansea',
-        'Stoke City'  : 'Stoke',
-        'Hull City' : 'Hull',
-        "Parma" : "Parma Calcio 1913"
-      })
+  return f"""
+    <h1>Welcome to League Table Predictor API</h1>
+    <p>The predictor predicts the outcome of the league based on the current form of the teams in each league.</p>
+    <p>To get the data for a league please fetch data from the appropriate endpoint below:</p>
+    <ul>
+      <li>Bundesliga => <a href="https://{domain_name}/league/bundesliga">https://{domain_name}/league/bundesliga</a></li>
+      <li>English Premier League => <a href="https://{domain_name}/league/epl">https://{domain_name}/league/epl</a></li>
+      <li>La Liga => <a href="https://{domain_name}/league/la_liga">https://{domain_name}/league/la_liga</a></li>
+      <li>Ligue 1 => <a href="https://{domain_name}/league/ligue_1">https://{domain_name}/league/ligue_1</a></li>
+      <li>Serie A=> <a href="https://{domain_name}/league/serie-a">https://{domain_name}/league/serie-a</a></li>
+    </ul>
+  """
+
+@app.route("/league/<league_name>")
+def predict(league_name):
+  
+  return get_understat_league_json_data(league_name)
 
 
 # --- Code should be above this line---
