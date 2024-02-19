@@ -6,13 +6,14 @@ The following **leagues are included in this model**:
 
 - Bundesliga
 - English Premiere League (EPL)
-- La Liga
+- LaLiga
 - Ligue 1
 - Serie A
 
 ---
 
 **Credit:**
+A massive thank you to Kie Millett, Understat, and SofaScore, without whom this project would not have been possible.
 
-- This code is largely based on [this video](https://www.youtube.com/watch?v=24e_Z4WHR48&pp=ygUfbW9udGUgY2FybG8gc2ltdWxhdGlvbiBmb290YmFsbA%3D%3D) by [Kie Millett](https://www.youtube.com/@KieMillett), where he implements the same concept using Microsoft Excel.
+- The Monte Carlo algorithm used to make the predictions is based on [this video](https://www.youtube.com/watch?v=24e_Z4WHR48&pp=ygUfbW9udGUgY2FybG8gc2ltdWxhdGlvbiBmb290YmFsbA%3D%3D) by [Kie Millett](https://www.youtube.com/@KieMillett), where he implements the same concept using Microsoft Excel.
 - The data required to make the predictions are gotten from [Understat](https://understat.com/) and [SofaScore](https://www.sofascore.com/)
