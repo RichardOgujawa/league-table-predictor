@@ -6,26 +6,25 @@ import functions as f
 """### Create Flask Application"""
 app = Flask(__name__)
 
-"""### **1.2 Constants**"""
 
-# Main function to run everything sequentially
-def predict_main(league_name, print_options=False):
-  # Get current league table with sofascore team id and understat stats 
-  home_df, away_df = f.get_current_league_table_df_data(league_name)
-  # Get the average goals scored and conceded per game
-  avg_gpg_dict = f.get_avg_gpg_dict(home_df, away_df)
-  # Get the predicted points
-  expected_df = f.get_expected_df(home_df, away_df, avg_gpg_dict)
-  # Merge the predicted points with the current table
-  merged_df = f.merge_home_n_away_df(expected_df, home_df, away_df)
+# # Main function to run everything sequentially
+# def predict_main(league_name, print_options=False):
+#   # Get current league table with sofascore team id and understat stats 
+#   home_df, away_df = f.get_current_league_table_df_data(league_name)
+#   # Get the average goals scored and conceded per game
+#   avg_gpg_dict = f.get_avg_gpg_dict(home_df, away_df)
+#   # Get the predicted points
+#   expected_df = f.get_expected_df(home_df, away_df, avg_gpg_dict)
+#   # Merge the predicted points with the current table
+#   merged_df = f.merge_home_n_away_df(expected_df, home_df, away_df)
 
-  returned_json = {
-    'league': league_name, 
-    'number_of_teams': len(merged_df),
-    'predicted_table': merged_df.to_dict('records')
-  }
+#   returned_json = {
+#     'league': league_name, 
+#     'number_of_teams': len(merged_df),
+#     'predicted_table': merged_df.to_dict('records')
+#   }
 
-  return returned_json
+#   return returned_json
 
 
 
@@ -46,10 +45,10 @@ def home():
     </ul>
   """
 
-@app.route("/league/<league_name>")
-def predict(league_name):
-  predicted_table_as_str = predict_main(league_name, True)
-  return json.dumps(predicted_table_as_str)
+# @app.route("/league/<league_name>")
+# def predict(league_name):
+#   predicted_table_as_str = predict_main(league_name, True)
+#   return json.dumps(predicted_table_as_str)
 
 
 # --- Code should be above this line---
