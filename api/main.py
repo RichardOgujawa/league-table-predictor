@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify
-import json
-import functions as f
+# import json
+# import functions as f
 
 
 """### Create Flask Application"""
 app = Flask(__name__)
-
 
 # # Main function to run everything sequentially
 # def predict_main(league_name, print_options=False):
