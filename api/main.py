@@ -643,7 +643,6 @@ def monte_carlo(home_team, away_team, avg_gpg, home_df, away_df, print_options=F
 
 # Pass in a team and get how many point we expect them to get by the end of the season
 def end_of_season_xp(id, home_df, away_df, avg_gpg, print_options=False):
-
   # Get the sofascore id from the df to get the fixtures from sofascore
   sofascore_id = home_df[home_df['team_id'] == id]['sofascore_team_id'].iloc[0]
 
@@ -684,43 +683,84 @@ def end_of_season_xp(id, home_df, away_df, avg_gpg, print_options=False):
 """### **3.6 End of League Table Prediction**"""
 # Simulate the remaining fixtures and print the resulting Premiere League Table.
 
-def get_expected_df(home_df, away_df, avg_gpg):
-  # Simulate the expected end of season PL table
-  expected_data = []
+# def get_expected_df(home_df, away_df, avg_gpg):
+#   # Simulate the expected end of season PL table
+#   expected_data = []
 
-  for _, row in home_df.iterrows():
-    expected_data.append({
-      'team_name' : row['team_name'],
-      'PTS': end_of_season_xp(row['team_id'], home_df, away_df, avg_gpg)
-    })
+#   for _, row in home_df.iterrows():
+#     expected_data.append({
+#       'team_name' : row['team_name'],
+#       'PTS': end_of_season_xp(row['team_id'], home_df, away_df, avg_gpg)
+#     })
+
+
+#   # Create the expected premier league df, sort by points and reset the index and drop the old one
+#   expected_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_data).sort_values(by='PTS', ascending=False).reset_index(drop=True)
+#   # Add one to all the values so that the index goes from 1 to 20, instead of 0 to 19
+#   expected_df.index +=1
+#   # Rename index to position
+#   expected_df.rename_axis('position', axis='index', inplace=True)
+
+#   return expected_df
+
+
+# # Current PL Table
+
+# def merge_home_n_away_df(expected_df, home_df, away_df): 
+#   df = home_df + away_df
+#   df['team_name'] = df['team_name'].apply(split_name_in_half)
+#   df.drop(columns=['team_id', 'xG', 'xGA', 'xPTS', 'sofascore_team_id', 'gpg scored', 'gpg conceded'], inplace=True)
+
+#   # Merge dfs to get predicted points and sort by current points
+#   # Merge the DataFrames
+#   merged_df = df.merge(expected_df, on='team_name', suffixes=('_current', '_prediction'))
+
+#   # Sort the merged DataFrame
+#   merged_df = merged_df.sort_values(by='PTS_prediction', ascending=False)
+
+#   # Reset the index
+#   merged_df.reset_index(drop=True, inplace=True)
+
+#   # Calculate Goal Difference
+#   merged_df['GD'] = merged_df['G'] - merged_df['GA']
+#   # Reorder columns
+#   merged_df['position'] = range(1, len(merged_df) + 1) 
+#   merged_df = merged_df[['position', 'team_name', 'M', 'D', 'L', 'G', 'GA', 'GD', 'PTS_current', 'PTS_prediction']]
+
+#   # Print df
+#   return merged_df
+
+# predictions for a single team
+def get_predicted_team_stats(home_df, away_df, avg_gpg, team_name):
+  # We only care about the row in the df the team we're looking for is on
+  team_row_home = home_df[home_df['team_name'] == team_name]
+  team_row_away = away_df[away_df['team_name'] == team_name]
+
+
+  # Simulate the expected end of season PL team stats
+  expected_data = []
+  expected_data.append({
+      'team_name' : team_name,
+      'PTS': end_of_season_xp(team_row_home['team_id'].values[0], home_df, away_df, avg_gpg)
+  })
 
 
   # Create the expected premier league df, sort by points and reset the index and drop the old one
-  expected_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_data).sort_values(by='PTS', ascending=False).reset_index(drop=True)
-  # Add one to all the values so that the index goes from 1 to 20, instead of 0 to 19
-  expected_df.index +=1
-  # Rename index to position
-  expected_df.rename_axis('position', axis='index', inplace=True)
+  expected_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_data)
+  
+  return team_row_home, team_row_away, expected_df
 
-  return expected_df
 
-# Current PL Table
-
-def merge_home_n_away_df(expected_df, home_df, away_df): 
-  df = home_df + away_df
+def merge_team_home_n_away_df(expected_df, team_row_home, team_row_away): 
+  # We only care about the row in the df the team we're looking for is on
+  df = team_row_home + team_row_away
+  # When yhou add the dfs together it also adds the team name strings together (concatenates them)
   df['team_name'] = df['team_name'].apply(split_name_in_half)
   df.drop(columns=['team_id', 'xG', 'xGA', 'xPTS', 'sofascore_team_id', 'gpg scored', 'gpg conceded'], inplace=True)
 
   # Merge dfs to get predicted points and sort by current points
   # Merge the DataFrames
   merged_df = df.merge(expected_df, on='team_name', suffixes=('_current', '_prediction'))
-
-  # Sort the merged DataFrame
-  merged_df = merged_df.sort_values(by='PTS_prediction', ascending=False)
-
-  # Reset the index
-  merged_df.reset_index(drop=True, inplace=True)
-
   # Calculate Goal Difference
   merged_df['GD'] = merged_df['G'] - merged_df['GA']
   # Reorder columns
@@ -732,23 +772,28 @@ def merge_home_n_away_df(expected_df, home_df, away_df):
 
 
 # Main function to run everything sequentially
-def predict_main(league_name, print_options=False):
+def predict_main(league_name, team_name, print_options=False):
   # Get current league table with sofascore team id and understat stats 
   home_df, away_df = get_current_league_table_df_data(league_name)
   # Get the average goals scored and conceded per game
   avg_gpg_dict = get_avg_gpg_dict(home_df, away_df)
   # Get the predicted points
-  expected_df = get_expected_df(home_df, away_df, avg_gpg_dict)
-  # Merge the predicted points with the current table
-  merged_df = merge_home_n_away_df(expected_df, home_df, away_df)
+  team_name = team_name.title() # The keys in the df are in titlecasing not lowercasing
+  # team_row_home, team_row_away, expected_df = get_predicted_team_stats(home_df, away_df, avg_gpg_dict, team_name)
+  team_row_home, team_row_away, expected_df = get_predicted_team_stats(home_df, away_df, avg_gpg_dict, team_name)
+  # # Merge the predicted points with the current table
+  merged_df = merge_team_home_n_away_df(expected_df, team_row_home, team_row_away)
 
   returned_json = {
     'league': league_name, 
     'number_of_teams': len(merged_df),
-    'predicted_table': merged_df.to_dict('records')
+    'prediction': merged_df.to_dict('records')
   }
 
+  # return returned_json
   return returned_json
+
+print(predict_main('epl', 'Arsenal', True))
 
 
 # App routes
@@ -768,16 +813,20 @@ def home():
     </ul>
   """
 
-@app.route("/league/<league_name>")
-def predict(league_name):
-  predicted_table_as_str = predict_main(league_name, True)
+@app.route("/league/<league_name>/team/<team_name>")
+def predict(league_name, team_name):
+  # return team_name
+  predicted_table_as_str = predict_main(league_name, team_name, True)
+  print(predicted_table_as_str)
   return json.dumps(predicted_table_as_str)
 
 
 # --- Code should be above this line---
-# Run server
-if __name__ == "__main__": 
-   app.run(debug=True)
+# # Run server
+# if __name__ == "__main__": 
+#    app.run(debug=True)
+
+# !!Why it's not working on Vercel!! When using Vercel with a Hobby plan, your serverless API routes can only be processed for 5 seconds. This means that after 5 seconds, the route responds with a 504 GATEWAY TIMEOUT error.
 
 # Production server
 # More on it here: 
