@@ -820,17 +820,17 @@ def encode_str(team_name):
 # App routes
 @app.route("/")
 def home():
-  domain_name = "https://league-table-predictor-git-main-richardogujawa.vercel.app"
   return f"""
     <h1>Welcome to League Table Predictor API ⚽️</h1>
     <p>The predictor predicts how many points a team is likely to get in any of the top five major football leagues in Europe based on their current form.</p>
     <p>To see the endpoints you need to fetch to get that data check out the following endpoints for each league:</p>
     <ul>
-      <li><b>Bundesliga</b> ==> "/league/bundesliga/teams" </li>
-      <li><b>English Premier League</b> ==> "/league/epl/teams" </li>
-      <li><b>LaLiga</b> ==> "/league/laliga/teams" </li>
-      <li><b>Ligue 1</b> ==> "/league/ligue_1/teams" </li>
-      <li><b>Serie A</b> ==> "/league/serie_a/teams" </li>
+      <li><b>Bundesliga</b> ==> <code><a href="/league/bundesliga/teams">"league/bundesliga/teams"</a></code> </li>
+      <li><b>English Premier League</b> ==> <code><a href="/league/epl/teams">"league/epl/teams"</a></code> </li>
+      <li><b>LaLiga</b> ==> <code><a href="/league/laliga/teams">"league/laliga/teams"</a></code> </li>
+      <li><b>Ligue 1</b> ==> <code><a href="/league/ligue_1/teams">"league/ligue_1/teams"</a></code> </li>
+      <li><b>Serie A</b> ==> <code><a href="/league/serie_a/teams">"league/serie_a/teams"</a></code> </li>
+   
     </ul>
   """
 
@@ -850,9 +850,8 @@ def get_league_teams(league_name):
   # Get list of teams in the league
   home_df, _ = get_current_league_table_df_data(league_name)
   teams_in_league = list(home_df['team_name'])
-  teams_in_league_html = ''.join([f'<li><b>{team} ==> </b> "/league/{encode_str(league_name)}/team/{encode_str(team)}" \n</li><br>' for team in teams_in_league])
+  teams_in_league_html = ''.join([f'<li><b>{team} ==> </b> <a href="/league/{encode_str(league_name)}/team/{encode_str(team)}">"/league/{encode_str(league_name)}/team/{encode_str(team)}"</a> \n</li><br>' for team in teams_in_league])
   
-
   # Return HTML with team names info
   return f"""
       <h1>{readable_league_name[league_name]}</h1>
@@ -864,12 +863,24 @@ def get_league_teams(league_name):
 # If user wants to get predicted points for a team
 @app.route("/league/<league_name>")
 def incomplete_endpoint(league_name):
-  return f"""
-      <h1>This endpoint doesn't exist</h1>
-      <p>It appears as though you may have an incomplete endpoint url, did you mean <b>'league/{encode_str(league_name)}/teams'?</b></p>
-  """
-
-
+  if league_name in ['epl', 'bundesliga', 'laliga', 'ligue_1', 'serie_a']:
+    return f"""
+        <h1>This endpoint doesn't exist</h1>
+        <p>It appears as though you may have an incomplete endpoint url, did you mean <b>'league/{encode_str(league_name)}/teams'?</b></p>
+    """
+  else: 
+    return '<h1>Leage Name Unrecognised</h1> Please refer to homepage for list of leagues in our database ==> <a href="/">Home</a>'
+  
+# If user wants to get predicted points for a team
+@app.route("/<league_name>")
+def incomplete_endpoint_2(league_name):
+  if league_name in ['epl', 'bundesliga', 'laliga', 'ligue_1', 'serie_a']:
+    return f"""
+        <h1>This endpoint doesn't exist</h1>
+        <p>It appears as though you may have an incomplete endpoint url, did you mean <b>'league/{encode_str(league_name)}/teams'?</b></p>
+    """
+  else: 
+    return '<h1>Leage Name Unrecognised</h1> Please refer to homepage for list of leagues in our database ==> <a href="/">Home</a>'
 
 # If user wants to get predicted points for a team
 @app.route("/league/<league_name>/team/<team_name>")
@@ -885,8 +896,6 @@ def predict(league_name, team_name):
 # Run server
 if __name__ == "__main__": 
    app.run(debug=True)
-
-# # !!Why it's not working on Vercel!! When using Vercel with a Hobby plan, your serverless API routes can only be processed for 5 seconds. This means that after 5 seconds, the route responds with a 504 GATEWAY TIMEOUT error.
 
 # # Production server
 # # More on it here: 
