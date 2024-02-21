@@ -313,6 +313,7 @@ def get_current_league_table_df_data(league_name):
     team_data = understat_json[id]
     # Get the home team_data
     home_team_data = {
+        'encoded_name' : encode_str(team_data['title']),
         'team_id' : int(id),
         'team_name' : team_data['title'],
         'M': 0,
@@ -327,6 +328,7 @@ def get_current_league_table_df_data(league_name):
         'xPTS': 0,
     }
     away_team_data = {
+        'encoded_name' : encode_str(team_data['title']),
         'team_id' : int(id),
         'team_name' : team_data['title'],
         'M': 0,
@@ -375,7 +377,7 @@ def get_current_league_table_df_data(league_name):
   # a_df = pd.DataFrame(away_league_table_data)
   # print(h_df)
 
-  columns = ['team_id', 'team_name','M', 'W','D','L', 'G', 'GA', 'PTS', 'xG', 'xGA', 'xPTS']
+  columns = ['team_id', 'team_name','M', 'W','D','L', 'G', 'GA', 'PTS', 'xG', 'xGA', 'xPTS', 'encoded_name']
   home_df = pd.DataFrame(columns=columns, data=home_league_table_data).sort_values(by='team_name')
   away_df = pd.DataFrame(columns=columns, data=away_league_table_data).sort_values(by='team_name')
 
@@ -730,23 +732,22 @@ def end_of_season_xp(id, home_df, away_df, avg_gpg, print_options=False):
 #   # Print df
 #   return merged_df
 
-# predictions for a single team
+"""# predictions for a single team"""
 def get_predicted_team_stats(home_df, away_df, avg_gpg, team_name):
   # We only care about the row in the df the team we're looking for is on
-  team_row_home = home_df[home_df['team_name'] == team_name]
-  team_row_away = away_df[away_df['team_name'] == team_name]
-
+  team_row_home = home_df[home_df['encoded_name'] == team_name]
+  team_row_away = away_df[away_df['encoded_name'] == team_name]
 
   # Simulate the expected end of season PL team stats
   expected_data = []
   expected_data.append({
-      'team_name' : team_name,
+      'encoded_name' : team_name,
       'PTS': end_of_season_xp(team_row_home['team_id'].values[0], home_df, away_df, avg_gpg)
   })
 
 
   # Create the expected premier league df, sort by points and reset the index and drop the old one
-  expected_df = pd.DataFrame(columns=['team_name', 'PTS'], data=expected_data)
+  expected_df = pd.DataFrame(columns=['encoded_name', 'PTS'], data=expected_data)
   
   return team_row_home, team_row_away, expected_df
 
@@ -754,19 +755,22 @@ def get_predicted_team_stats(home_df, away_df, avg_gpg, team_name):
 def merge_team_home_n_away_df(expected_df, team_row_home, team_row_away): 
   # We only care about the row in the df the team we're looking for is on
   df = team_row_home + team_row_away
+
   # When yhou add the dfs together it also adds the team name strings together (concatenates them)
   df['team_name'] = df['team_name'].apply(split_name_in_half)
+  df['encoded_name'] = df['encoded_name'].apply(split_name_in_half)
+  # Drop unnecessary columns
   df.drop(columns=['team_id', 'xG', 'xGA', 'xPTS', 'sofascore_team_id', 'gpg scored', 'gpg conceded'], inplace=True)
 
   # Merge dfs to get predicted points and sort by current points
   # Merge the DataFrames
-  merged_df = df.merge(expected_df, on='team_name', suffixes=('_current', '_prediction'))
+  merged_df = df.merge(expected_df, on='encoded_name', suffixes=('_current', '_prediction'))
   # Calculate Goal Difference
   merged_df['GD'] = merged_df['G'] - merged_df['GA']
   # Reorder columns
   merged_df['position'] = range(1, len(merged_df) + 1) 
-  merged_df = merged_df[['position', 'team_name', 'M', 'D', 'L', 'G', 'GA', 'GD', 'PTS_current', 'PTS_prediction']]
-
+  merged_df = merged_df[['position', 'team_name', 'M', 'D', 'L', 'G', 'GA', 'GD', 'PTS_current', 'PTS_prediction', 'encoded_name']]
+  
   # Print df
   return merged_df
 
@@ -775,62 +779,118 @@ def merge_team_home_n_away_df(expected_df, team_row_home, team_row_away):
 def predict_main(league_name, team_name, print_options=False):
   # Get current league table with sofascore team id and understat stats 
   home_df, away_df = get_current_league_table_df_data(league_name)
-  # Get the average goals scored and conceded per game
+  # # Get the average goals scored and conceded per game
   avg_gpg_dict = get_avg_gpg_dict(home_df, away_df)
-  # Get the predicted points
-  team_name = team_name.title() # The keys in the df are in titlecasing not lowercasing
+  # # Get the predicted point
   # team_row_home, team_row_away, expected_df = get_predicted_team_stats(home_df, away_df, avg_gpg_dict, team_name)
   team_row_home, team_row_away, expected_df = get_predicted_team_stats(home_df, away_df, avg_gpg_dict, team_name)
   # # Merge the predicted points with the current table
   merged_df = merge_team_home_n_away_df(expected_df, team_row_home, team_row_away)
 
   returned_json = {
-    'league': league_name, 
-    'number_of_teams': len(merged_df),
+    'league': league_name,
+    'num_of_teams_in_league': len(home_df),
     'prediction': merged_df.to_dict('records')
   }
 
-  # return returned_json
   return returned_json
 
-print(predict_main('epl', 'Arsenal', True))
+def decode_str(team_name):
+  # replace underscores with spaces
+  team_name = team_name.replace('_', ' ')
 
+  # Upper Case the first letter of each word
+  team_name_list = team_name.split(' ')
+  
+  # Title case each word
+  team_name_list= [word[0].upper() + word[1:] for word in team_name_list]
+  team_name_str = ' '.join(team_name_list)
+
+  return team_name_str
+
+def encode_str(team_name):
+  # replace spaces with underscores
+  team_name_cleaned = team_name.replace(' ', '_')
+
+  # lowercase everything
+  team_name_lower = team_name_cleaned.lower()
+
+  return team_name_lower
 
 # App routes
 @app.route("/")
 def home():
   domain_name = "https://league-table-predictor-git-main-richardogujawa.vercel.app"
   return f"""
-    <h1>Welcome to League Table Predictor API</h1>
-    <p>The predictor predicts the outcome of the league based on the current form of the teams in each league.</p>
-    <p>To get the data for a league please fetch data from the appropriate endpoint below:</p>
+    <h1>Welcome to League Table Predictor API ⚽️</h1>
+    <p>The predictor predicts how many points a team is likely to get in any of the top five major football leagues in Europe based on their current form.</p>
+    <p>To see the endpoints you need to fetch to get that data check out the following endpoints for each league:</p>
     <ul>
-      <li>Bundesliga => <a href="https://{domain_name}/league/bundesliga">https://{domain_name}/league/bundesliga</a></li>
-      <li>English Premier League => <a href="https://{domain_name}/league/epl">https://{domain_name}/league/epl</a></li>
-      <li>LaLiga => <a href="https://{domain_name}/league/laliga">https://{domain_name}/league/laliga</a></li>
-      <li>Ligue 1 => <a href="https://{domain_name}/league/ligue_1">https://{domain_name}/league/ligue_1</a></li>
-      <li>Serie A=> <a href="https://{domain_name}/league/serie-a">https://{domain_name}/league/serie_a</a></li>
+      <li><b>Bundesliga</b> ==> "/league/bundesliga/teams" </li>
+      <li><b>English Premier League</b> ==> "/league/epl/teams" </li>
+      <li><b>LaLiga</b> ==> "/league/laliga/teams" </li>
+      <li><b>Ligue 1</b> ==> "/league/ligue_1/teams" </li>
+      <li><b>Serie A</b> ==> "/league/serie_a/teams" </li>
     </ul>
   """
 
+# If the user wants to see which teams
+@app.route ("/league/<league_name>/teams")
+def get_league_teams(league_name):
+  # Return how the team names are for that league
+  # Get readable team name
+  readable_league_name = {
+    'bundesliga': 'Bundesliga',
+    'epl' : 'Premier League', 
+    'laliga' : 'LaLiga', 
+    'ligue_1' : 'Ligue 1',
+    'serie_a' : 'Serie A'
+  }
+
+  # Get list of teams in the league
+  home_df, _ = get_current_league_table_df_data(league_name)
+  teams_in_league = list(home_df['team_name'])
+  teams_in_league_html = ''.join([f'<li><b>{team} ==> </b> "/league/{encode_str(league_name)}/team/{encode_str(team)}" \n</li><br>' for team in teams_in_league])
+  
+
+  # Return HTML with team names info
+  return f"""
+      <h1>{readable_league_name[league_name]}</h1>
+      <p>Below is a list of the team in the {readable_league_name[league_name]} and the API endpoints that you can fetch their predicted points from:</p>
+      <ul>{teams_in_league_html}
+      </ul>
+  """
+
+# If user wants to get predicted points for a team
+@app.route("/league/<league_name>")
+def incomplete_endpoint(league_name):
+  return f"""
+      <h1>This endpoint doesn't exist</h1>
+      <p>It appears as though you may have an incomplete endpoint url, did you mean <b>'league/{encode_str(league_name)}/teams'?</b></p>
+  """
+
+
+
+# If user wants to get predicted points for a team
 @app.route("/league/<league_name>/team/<team_name>")
 def predict(league_name, team_name):
-  # return team_name
+  predict_main(league_name, team_name, True)
+  # convert team name to suitable format
   predicted_table_as_str = predict_main(league_name, team_name, True)
   print(predicted_table_as_str)
   return json.dumps(predicted_table_as_str)
 
 
 # --- Code should be above this line---
-# # Run server
-# if __name__ == "__main__": 
-#    app.run(debug=True)
+# Run server
+if __name__ == "__main__": 
+   app.run(debug=True)
 
-# !!Why it's not working on Vercel!! When using Vercel with a Hobby plan, your serverless API routes can only be processed for 5 seconds. This means that after 5 seconds, the route responds with a 504 GATEWAY TIMEOUT error.
+# # !!Why it's not working on Vercel!! When using Vercel with a Hobby plan, your serverless API routes can only be processed for 5 seconds. This means that after 5 seconds, the route responds with a 504 GATEWAY TIMEOUT error.
 
-# Production server
-# More on it here: 
-# https://stackoverflow.com/questions/51025893/flask-at-first-run-do-not-use-the-development-server-in-a-production-environmen
-# if __name__ == "__main__":
-#     from waitress import serve
-#     serve(app, host="0.0.0.0", port=8080)
+# # Production server
+# # More on it here: 
+# # https://stackoverflow.com/questions/51025893/flask-at-first-run-do-not-use-the-development-server-in-a-production-environmen
+# # if __name__ == "__main__":
+# #     from waitress import serve
+# #     serve(app, host="0.0.0.0", port=8080)
