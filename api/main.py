@@ -11,7 +11,7 @@ from flask import Flask, request, jsonify
 import json
 import datetime
 import re
-from test import hello
+# from test import hello
 
 """### Create Flask Application"""
 app = Flask(__name__)
@@ -24,7 +24,7 @@ USER_AGENT = {
 }
 
 # Just to test something, will be removed after testing
-hello()
+# hello()
 
 HEADERS = {
     'authority': 'api.sofascore.com',
