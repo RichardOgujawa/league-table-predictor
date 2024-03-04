@@ -4,13 +4,14 @@ from bs4 import BeautifulSoup
 import json
 import pandas as pd
 import re
-from time import sleep
+# from time import sleep
 from datetime import datetime, date
 import matplotlib.pyplot as plt
 from flask import Flask, request, jsonify
 import json
 import datetime
 import re
+from test import hello
 
 """### Create Flask Application"""
 app = Flask(__name__)
@@ -21,6 +22,9 @@ app = Flask(__name__)
 USER_AGENT = {
     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 }
+
+# Just to test something, will be removed after testing
+hello()
 
 HEADERS = {
     'authority': 'api.sofascore.com',
@@ -903,3 +907,16 @@ if __name__ == "__main__":
 # # if __name__ == "__main__":
 # #     from waitress import serve
 # #     serve(app, host="0.0.0.0", port=8080)
+   
+  
+
+# Things to look at: 
+   """
+   - Average time of their last score in 
+   - Test with previous data to evaluate the performance
+   - Add player contribution 
+   - Add in the option for the person fetching data to get the end of season prediction, or prediction
+    after n games, etc. That's really easy to implement it's just a matter of slicing the fixutures list 
+    [0:n]
+    - You can extend this API to other leagues too using FB stats here: https://fbref.com/en/comps/22/Major-League-Soccer-Stats
+   """
