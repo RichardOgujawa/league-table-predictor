@@ -2,6 +2,8 @@
 
 This model allows you to **retrieve data from any of the five major football leagues in Europe** and can then be used to **generate predictions on how the table at the end of the season is likely to look** like if they continue their current run of form.
 
+Link to project 👉🏾 https://colab.research.google.com/drive/1UvqfhyEcmhSG8YAok3GnOq23Xc3VD3OA?authuser=1#scrollTo=nhdQFwH6zvOb&uniqifier=3
+
 The following **leagues are included in this model**:
 
 - Bundesliga
